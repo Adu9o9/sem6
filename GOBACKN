@@ -1,0 +1,114 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdbool.h>
+
+#define TOTAL_FRAMES 10
+#define WINDOW_SIZE 4
+
+int main() {
+    int send_base = 1;      // The oldest unacknowledged frame
+    int next_seq_num = 1;   // The next frame to be sent
+    int ack_received;
+    
+    printf("--- SIMULATING GO-BACK-N ARQ (Window Size: %d) ---\n\n", WINDOW_SIZE);
+
+    // Keep loop running until all frames are acknowledged
+    while (send_base <= TOTAL_FRAMES) {
+        
+        // 1. SENDING PHASE
+        // Send as many frames as the window allows
+        while (next_seq_num < send_base + WINDOW_SIZE && next_seq_num <= TOTAL_FRAMES) {
+            printf("SENDER: Sending Frame %d\n", next_seq_num);
+            next_seq_num++;
+            usleep(500000); // Sleep 0.5s for effect
+        }
+
+        printf("\n--- Window Full or All Sent. Waiting for ACKs... ---\n");
+        sleep(1);
+
+        // 2. ACKNOWLEDGEMENT PHASE (Simulation)
+        // We simulate that the receiver successfully ACKs up to a random point
+        // If we sent 1,2,3,4, maybe we only get ACK for 1 and 2 (ACK 3).
+        
+        // Randomly decide the last successful frame received in this batch
+        // Range: from send_base to (next_seq_num - 1)
+        int frames_in_flight = next_seq_num - send_base;
+        int successful_frames = rand() % (frames_in_flight + 1); // 0 to all
+        
+        // Handling the "Loss" Scenario
+        if (successful_frames == frames_in_flight) {
+            // Best Case: Everything worked
+            ack_received = next_seq_num; 
+            printf("RECEIVER: Received all frames up to %d. Sending ACK %d.\n", next_seq_num-1, ack_received);
+            send_base = next_seq_num;
+        } else {
+            // Loss Case
+            int lost_frame = send_base + successful_frames;
+            ack_received = lost_frame; // Receiver expects this one next
+            
+            if (successful_frames == 0) {
+                 printf("NETWORK: Frame %d Lost! Timeout occurred.\n", send_base);
+            } else {
+                 printf("RECEIVER: Received good frames up to %d. Expecting %d next (ACK %d).\n", 
+                        lost_frame-1, lost_frame, lost_frame);
+                 printf("NETWORK: Frame %d Lost or Damaged!\n", lost_frame);
+            }
+            
+            // GO BACK N Logic
+            printf("SENDER: ACK %d received. Sliding window base to %d.\n", ack_received, send_base);
+            printf("SENDER: *** TIMEOUT! Go-Back-N triggered. Resending from Frame %d ***\n\n", lost_frame);
+            
+            // Reset 'next_seq_num' back to the lost frame to re-enter the loop
+            next_seq_num = lost_frame;
+            // 'send_base' does not change yet because we haven't effectively moved past the error
+        }
+        printf("--------------------------------------------------\n");
+    }
+
+    printf("\n--- Transmission Complete. All %d frames acknowledged. ---\n", TOTAL_FRAMES);
+    return 0;
+}
+Part 3: Lab Record (Algo & Output)
+Experiment 5b: Simulation of Go-Back-N ARQ Protocol
+
+Aim: To simulate the Go-Back-N Sliding Window protocol and demonstrate the retransmission of multiple frames upon error.
+
+Algorithm
+Start.
+
+Initialize Total_Frames, Window_Size (N), Send_Base = 1, Next_Seq_Num = 1.
+
+Loop while Send_Base <= Total_Frames:
+
+Sending Loop: Check if Next_Seq_Num < Send_Base + N.
+
+If true, Send Frame Next_Seq_Num.
+
+Increment Next_Seq_Num.
+
+Wait: Wait for Acknowledgements.
+
+Simulate Reception:
+
+Generate random success/fail status for the batch of sent frames.
+
+Case 1 (Success): If all sent frames are acknowledged:
+
+Move Send_Base forward to Next_Seq_Num.
+
+Case 2 (Packet Loss at Frame X):
+
+Receiver sends ACK for the last correctly received frame (ACK X).
+
+Sender detects Timeout/Gap.
+
+Go-Back-N: Sender resets Next_Seq_Num to X.
+
+(In next iteration, Sender effectively retransmits Frame X and all subsequent frames).
+
+End Loop when all frames are acknowledged.
+
+Stop.
+
+Sample Output
