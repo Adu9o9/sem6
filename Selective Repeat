@@ -1,0 +1,160 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <time.h>
+
+#define TOTAL_FRAMES 10
+#define WINDOW_SIZE 4
+
+// Structure to track the status of each frame
+typedef struct {
+    int seq_num;
+    bool acked;
+} Frame;
+
+int main() {
+    Frame frames[TOTAL_FRAMES + 1]; // 1-based indexing for simplicity
+    int send_base = 1;
+    int next_seq_num = 1;
+    
+    // Initialize frames
+    for (int i = 1; i <= TOTAL_FRAMES; i++) {
+        frames[i].seq_num = i;
+        frames[i].acked = false;
+    }
+    
+    srand(time(0)); // Seed random number generator
+
+    printf("--- SIMULATING SELECTIVE REPEAT ARQ (Window Size: %d) ---\n\n", WINDOW_SIZE);
+
+    while (send_base <= TOTAL_FRAMES) {
+        
+        // 1. SENDING PHASE
+        // Send any frame in the window that hasn't been ACKed yet
+        for (int i = send_base; i < send_base + WINDOW_SIZE && i <= TOTAL_FRAMES; i++) {
+            if (!frames[i].acked) {
+                // To avoid spamming "Sending Frame X" every loop, we could add a flag, 
+                // but for simulation, we'll just simulate sending un-acked frames.
+                // In a real protocol, we'd check a timer per frame.
+                // Here, we simulate a "transmission attempt".
+                printf("SENDER: Sending Frame %d\n", i);
+            }
+        }
+        
+        printf("\n--- Waiting for ACKs... ---\n");
+        sleep(1);
+
+        // 2. RECEIVING/ACK PHASE
+        // Check status for each frame in the current window
+        for (int i = send_base; i < send_base + WINDOW_SIZE && i <= TOTAL_FRAMES; i++) {
+            if (frames[i].acked) continue; // Already done
+
+            // Simulate Network: 80% chance of success
+            int luck = rand() % 10;
+            
+            if (luck < 8) {
+                // SUCCESS
+                printf("RECEIVER: Frame %d received. Sending ACK %d.\n", i, i);
+                printf("SENDER: Received ACK %d. Marking Frame %d as complete.\n", i, i);
+                frames[i].acked = true;
+            } else {
+                // LOSS
+                printf("NETWORK: Frame %d (or its ACK) LOST!\n", i);
+                printf("SENDER: Timeout for Frame %d. Will retransmit next cycle.\n", i);
+            }
+        }
+        
+        // 3. SLIDE WINDOW
+        // Move send_base forward only if the *first* frame in window is ACKed
+        while (send_base <= TOTAL_FRAMES && frames[send_base].acked) {
+            printf("SENDER: Sliding window base from %d to %d.\n", send_base, send_base + 1);
+            send_base++;
+        }
+        
+        printf("--------------------------------------------------\n");
+        usleep(500000); // Wait a bit before next cycle
+    }
+
+    printf("\n--- Transmission Complete. All %d frames acknowledged. ---\n", TOTAL_FRAMES);
+    return 0;
+}
+Experiment 5c: Simulation of Selective Repeat ARQ Protocol
+
+Aim: To simulate the Selective Repeat Sliding Window protocol and demonstrate the selective retransmission of lost frames.
+
+Algorithm
+Start.
+
+Initialize Total_Frames, Window_Size, Send_Base = 1.
+
+Create an array to track ACK status for each frame (initially False).
+
+Loop while Send_Base <= Total_Frames:
+
+Sending Loop: For each frame i from Send_Base to Send_Base + Window_Size:
+
+If Frame i is NOT acknowledged, Transmit Frame i.
+
+Simulation: Generate random status for each transmitted frame.
+
+Case 1 (Success):
+
+Receiver gets Frame i, sends ACK i.
+
+Sender marks Frame i as ACKed.
+
+Case 2 (Loss):
+
+Frame i is lost. Sender keeps it marked as "Unacknowledged".
+
+(In next iteration, loop will re-send ONLY this un-acked frame).
+
+Sliding Window:
+
+Check Frame at Send_Base.
+
+If ACKed is True, increment Send_Base.
+
+Repeat check (allows window to jump forward by multiple slots if consecutive frames are done).
+
+End Loop when all frames are acknowledged.
+
+Stop.
+
+Sample Output
+Plaintext
+
+--- SIMULATING SELECTIVE REPEAT ARQ (Window Size: 4) ---
+
+SENDER: Sending Frame 1
+SENDER: Sending Frame 2
+SENDER: Sending Frame 3
+SENDER: Sending Frame 4
+
+--- Waiting for ACKs... ---
+RECEIVER: Frame 1 received. Sending ACK 1.
+SENDER: Received ACK 1. Marking Frame 1 as complete.
+NETWORK: Frame 2 (or its ACK) LOST!
+SENDER: Timeout for Frame 2. Will retransmit next cycle.
+RECEIVER: Frame 3 received. Sending ACK 3.
+SENDER: Received ACK 3. Marking Frame 3 as complete.
+RECEIVER: Frame 4 received. Sending ACK 4.
+SENDER: Received ACK 4. Marking Frame 4 as complete.
+SENDER: Sliding window base from 1 to 2.
+--------------------------------------------------
+SENDER: Sending Frame 2
+SENDER: Sending Frame 5
+
+--- Waiting for ACKs... ---
+RECEIVER: Frame 2 received. Sending ACK 2.
+SENDER: Received ACK 2. Marking Frame 2 as complete.
+RECEIVER: Frame 5 received. Sending ACK 5.
+SENDER: Received ACK 5. Marking Frame 5 as complete.
+SENDER: Sliding window base from 2 to 3.
+SENDER: Sliding window base from 3 to 4.
+SENDER: Sliding window base from 4 to 5.
+SENDER: Sliding window base from 5 to 6.
+--------------------------------------------------
+
+--- Transmission Complete. All 10 frames acknowledged. ---
