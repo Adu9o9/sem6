@@ -1,0 +1,100 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define TOTAL_FRAMES 5
+
+int main() {
+    int i = 1; // Current frame to send
+    int timer = 0;
+    int outcome; // 0 = Loss, 1 = Ack, 2 = Timeout
+
+    printf("--- SIMULATING STOP AND WAIT ARQ ---\n\n");
+
+    while (i <= TOTAL_FRAMES) {
+        printf("SENDER: Sending Frame %d...\n", i);
+        
+        // Simulation: "Sending" takes a bit of time
+        sleep(1); 
+
+        // RANDOM EVENT GENERATOR
+        // We simulate 3 scenarios:
+        // 0-4: Successful ACK
+        // 5-7: Packet Lost (Timeout)
+        // 8-9: ACK Lost (Timeout)
+        int luck = rand() % 10; 
+
+        if (luck < 5) {
+            // Scenario 1: Success
+            printf("RECEIVER: Frame %d received correctly.\n", i);
+            printf("RECEIVER: Sending ACK %d.\n", i + 1);
+            printf("SENDER: ACK %d received. Moving to next frame.\n\n", i + 1);
+            i++; // Move to next frame
+        } 
+        else if (luck < 8) {
+            // Scenario 2: Frame Lost
+            printf("NETWORK: Frame %d DROPPED in transit!\n", i);
+            printf("SENDER: Timer expired (Timeout). Resending Frame %d...\n\n", i);
+            // 'i' does not increase, so loop repeats same frame
+        } 
+        else {
+            // Scenario 3: ACK Lost (Tricky case!)
+            printf("RECEIVER: Frame %d received correctly.\n", i);
+            printf("RECEIVER: Sending ACK %d.\n", i + 1);
+            printf("NETWORK: ACK %d DROPPED in transit!\n", i + 1);
+            printf("SENDER: Timer expired. Resending Frame %d...\n", i);
+            printf("RECEIVER: Duplicate Frame %d detected! Discarding but re-sending ACK.\n\n", i);
+            // In a real protocol, we handle duplicate detection here. 
+            // For simplicity, we just resend.
+        }
+    }
+
+    printf("--- All %d Frames Sent Successfully ---\n", TOTAL_FRAMES);
+    return 0;
+}
+
+Part 3: Lab Record (Algo & Output)
+Experiment 5a: Simulation of Stop and Wait ARQ Protocol
+
+Aim: To simulate the Stop and Wait Flow Control protocol and demonstrate how it handles packet loss and acknowledgement.
+
+Algorithm
+Start.
+
+Initialize the total number of frames to send (N).
+
+Set the current frame counter i = 1.
+
+Loop while i <= N:
+
+Send: Sender transmits Frame i. Start Timer.
+
+Decision (Simulated): Generate a random number to determine channel status.
+
+Case 1 (Success): If channel is clear:
+
+Receiver accepts Frame i.
+
+Receiver sends ACK i+1.
+
+Sender receives ACK, increments i.
+
+Case 2 (Packet Loss): If random number indicates loss:
+
+Frame i never reaches Receiver.
+
+Sender waits for Timer to expire (Timeout).
+
+Sender retransmits Frame i.
+
+Case 3 (ACK Loss): If ACK i+1 is lost:
+
+Sender waits for Timer to expire.
+
+Sender retransmits Frame i.
+
+Receiver detects duplicate, discards frame, and resends ACK i+1.
+
+End Loop when all frames are acknowledged.
+
+Stop.
